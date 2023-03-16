@@ -50,5 +50,6 @@ main()
   .catch((error) => {
     // console.error(error);
     console.log('error', error);
+    console.log('error', error?.response);
     process.exit(1);
   });

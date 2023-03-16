@@ -26,9 +26,10 @@ code_review:
   artifacts:
     reports:
       dotenv: dotenv.report
+  variables:
+    OPENAI_API_KEY: $OPENAI_API_KEY
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-
 # push-image:
 #   stage: push-image
 #   image:
