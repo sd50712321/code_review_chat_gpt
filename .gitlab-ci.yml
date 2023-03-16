@@ -1,0 +1,64 @@
+variables:
+  AWS_DEFAULT_REGION: ap-northeast-2
+  DOCKER_HOST: tcp://docker:2375
+  DOCKER_DRIVER: overlay2
+  IMAGE_NAME: $CI_REGISTRY_IMAGE
+  DEV_IMAGE_TAG: $CI_REGISTRY_IMAGE:latest
+  PROD_IMAGE_TAG: $CI_REGISTRY_IMAGE:prod-latest
+
+stages:
+  - code_review
+  - push-image
+  - deploy
+
+code_review:
+  stage: code_review
+  image: node:16
+  script:
+    - apt-get update -qq && apt-get install -y -qq git
+    - yarn install --frozen-lockfile --prefer-offline
+    - |
+      changed_files=$(git diff --name-only $CI_MERGE_REQUEST_DIFF_BASE_SHA $CI_COMMIT_SHA -- 'src/**/*.js' 'src/**/*.ts')
+      changed_files="${changed_files//$'\n'/ }"
+      echo "Changed Files: $changed_files"
+      echo "changed_files=$changed_files" >> $GCI_ENV_FILE
+    - node code_review.js $changed_files
+  artifacts:
+    reports:
+      dotenv: dotenv.report
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+
+push-image:
+  stage: push-image
+  image:
+    name: amazon/aws-cli
+    entrypoint: ['']
+  services:
+    - docker:dind
+  before_script:
+    - amazon-linux-extras install docker
+    - aws --version
+    - docker --version
+  script:
+    - |
+      if [[ $CI_COMMIT_REF_NAME == "development" ]]; then
+        export NODE_ENV=dev
+        export IMAGE_TAG=$DEV_IMAGE_TAG
+      else
+        export NODE_ENV=prod
+        export IMAGE_TAG=$PROD_IMAGE_TAG
+      fi
+    - docker pull $IMAGE_TAG || true
+    - docker build
+      --cache-from $IMAGE_TAG
+      --build-arg NODE_ENV=$NODE_ENV
+      --tag $IMAGE_TAG
+      --tag $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA .
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+    - docker push $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA
+    - docker push $IMAGE_TAG
+  only:
+    - development
+    - main
+
