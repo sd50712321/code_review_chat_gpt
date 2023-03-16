@@ -21,7 +21,7 @@ code_review:
       changed_files=$(git diff --name-only $CI_MERGE_REQUEST_DIFF_BASE_SHA $CI_COMMIT_SHA -- 'src/**/*.js' 'src/**/*.ts')
       changed_files="${changed_files//$'\n'/ }"
       echo "Changed Files: $changed_files"
-      echo "changed_files=$changed_files" >> $GCI_ENV_FILE
+      echo "changed_files=$changed_files" >> $CI_ENV_FILE
     - node code_review.js $changed_files
   artifacts:
     reports:
