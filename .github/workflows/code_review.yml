@@ -1,0 +1,80 @@
+name: Code Review with ChatGPT
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  code_review:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: write
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: 16
+
+      - name: Cache node modules
+        uses: actions/cache@v3
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-yarn
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile --prefer-offline
+
+      - name: Get changed files
+        id: changed_files
+        run: |
+          changed_files=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }} -- 'src/**/*.js' 'src/**/*.ts')
+          changed_files="${changed_files//$'\n'/ }"
+          echo "Changed Files: $changed_files"
+          echo "changed_files=$changed_files" >> $GITHUB_ENV
+
+      - name: Code Review with ChatGPT
+        id: code_review
+        run: |
+          file_list="${{ env.changed_files }}"
+          IFS=' ' read -ra files_array <<< "$file_list" # 공백을 기준으로 문자열을 배열로 변환
+          reviews=$(node code_review.js "${files_array[@]}") # 배열을 인수로 전달
+          if [ -z "$reviews" ]; then
+            echo "No reviews generated"
+            echo "::set-output name=reviews::{}" # empty JSON object
+          else
+            echo "리뷰 결과:"
+            echo "$reviews"
+            echo "::set-output name=reviews::$reviews"
+          fi
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+
+      - name: Debugging REVIEWS
+        run: |
+          echo "REVIEWS: ${{ steps.code_review.outputs.reviews }}"
+
+      - name: Add Code Review Comment
+        uses: actions/github-script@v5
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const reviews = JSON.parse(process.env.REVIEWS);
+            const reviewText = Object.entries(reviews).map(([file, review]) => `## File: ${file}\n\n${review}`).join('\n\n');
+            const reviewComment = `Code Review 결과:\n\n${reviewText}\n`;
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: reviewComment
+            });
+        env:
+          REVIEWS: ${{ steps.code_review.outputs.reviews }}
