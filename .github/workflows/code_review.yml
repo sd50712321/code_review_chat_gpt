@@ -58,9 +58,15 @@ jobs:
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
+      - name: Install jq
+        run: sudo apt-get install jq
+
       - name: Debugging REVIEWS
         run: |
-          echo "REVIEWS: ${{ steps.code_review.outputs.reviews }}"
+          echo 'REVIEWS:'
+          echo "$REVIEWS" | jq .
+        env:
+          REVIEWS: ${{ steps.code_review.outputs.reviews }}
 
       - name: Add Code Review Comment
         uses: actions/github-script@v5
