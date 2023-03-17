@@ -12,8 +12,11 @@ chat gpt pr 요청시 코드리뷰 시키기 gitlab, github 각각의 플래폼�
 
 3. ### variables 등록
 
-   - ![변수등록](./variables1.png)
-   - ![변수설정](./variables2.png)
+   - gitlab
+     - ![변수등록](./variables1.png)
+     - ![변수설정](./variables2.png)
+   - github
+     - ![secret등록](./variables3.png)
 
 4. ### .gitlab-ci.yml or github workflow파일 작성
 
