@@ -78,6 +78,9 @@ jobs:
 
             // 변경된 파일에 대한 리뷰만 남기기
             for (const [file, review] of Object.entries(reviews)) {
+              console.log(`Processing file: ${file}`);
+              console.log(`Review: ${review}`);
+              
               let lastCommitSha;
 
               // 파일이 변경된 마지막 커밋 찾기
@@ -90,6 +93,7 @@ jobs:
                 const changedFile = commitData.files.find(f => f.filename === file);
 
                 if (changedFile) {
+                  console.log(`Changed file found: ${changedFile.filename}`);
                   lastCommitSha = commit.sha;
                   break;
                 }
