@@ -11,6 +11,11 @@ stages:
   - push-image
   - deploy
 
+cache:
+  key: '$CI_COMMIT_REF_NAME'
+  paths:
+    - .yarn/cache
+
 code_review:
   stage: code_review
   image: node:16
@@ -23,11 +28,13 @@ code_review:
       echo "Changed Files: $changed_files"
       echo "changed_files=$changed_files" > dotenv.report
     - node code_review.js $changed_files
+    - GITLAB_API_TOKEN=$GITLAB_API_TOKEN node code_review.js $changed_files
   artifacts:
     reports:
       dotenv: dotenv.report
   variables:
     OPENAI_API_KEY: $OPENAI_API_KEY
+    GITLAB_API_TOKEN: $GITLAB_API_TOKEN
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
 # push-image:
