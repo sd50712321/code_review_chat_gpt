@@ -6,7 +6,9 @@ const axios = require('axios');
 
 const readFile = promisify(fs.readFile);
 
-const isGitLab = process.env.CI_PROJECT_URL.includes('gitlab.com');
+const isGitLab = process.env.CI_PROJECT_URL
+  ? process.env.CI_PROJECT_URL.includes('gitlab.com')
+  : false;
 
 async function createGitLabComment(projectId, mergeRequestId, reviewText) {
   const gitlabApiToken = process.env.GITLAB_API_TOKEN;
