@@ -79,7 +79,6 @@ jobs:
             // 변경된 파일에 대한 리뷰만 남기기
             for (const [file, review] of Object.entries(reviews)) {
               let lastCommitSha;
-              let lastLine;
 
               // 파일이 변경된 마지막 커밋 찾기
               for (const commit of commits.reverse()) {
@@ -92,23 +91,17 @@ jobs:
 
                 if (changedFile) {
                   lastCommitSha = commit.sha;
-                  lastLine = changedFile.patch.split('\n').reverse().find(line => line.startsWith('+'));
                   break;
                 }
               }
 
-              if (lastCommitSha && lastLine) {
-                const line = parseInt(lastLine.match(/\+(\d+)/)[1]);
-
+              if (lastCommitSha) {
                 const reviewComment = `${review}\n`;
-                await github.rest.pulls.createReviewComment({
+                await github.rest.repos.createCommitComment({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
-                  pull_number: context.issue.number,
-                  commit_id: lastCommitSha,
-                  body: reviewComment,
-                  path: file,
-                  line
+                  commit_sha: lastCommitSha,
+                  body: `**File: ${file}**\n\n${reviewComment}`,
                 });
               }
             }
