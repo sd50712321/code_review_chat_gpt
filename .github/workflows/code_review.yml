@@ -53,10 +53,7 @@ jobs:
           else
             echo "리뷰 결과:"
             echo "$reviews"
-            encoded_reviews=$(echo -n "$reviews" | jq -aRs .) # 리뷰 결과를 JSON 문자열로 인코딩
-            echo "Encoded reviews:"
-            echo "$encoded_reviews"
-            echo "::set-output name=reviews::$encoded_reviews"
+            echo "::set-output name=reviews::$reviews"
           fi
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -84,7 +81,7 @@ jobs:
               let lastCommitSha;
 
               // 파일이 변경된 마지막 커밋 찾기
-              for (const commit of commits.reverse()) {
+              for (const commit of commits) {
                 const { data: commitData } = await github.rest.repos.getCommit({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
@@ -94,7 +91,6 @@ jobs:
 
                 if (changedFile) {
                   lastCommitSha = commit.sha;
-                  break;
                 }
               }
 
@@ -108,5 +104,7 @@ jobs:
                 });
               }
             }
+            console.log(`Commit: ${commit.sha}`);
+            console.log(commitData.files.map(f => f.filename));
         env:
           REVIEWS: ${{ steps.code_review.outputs.reviews }}
