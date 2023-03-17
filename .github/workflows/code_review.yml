@@ -103,11 +103,13 @@ jobs:
 
               if (lastCommitSha) {
                 const reviewComment = `${review}\n`;
-                const result = await github.rest.repos.createCommitComment({
+                await github.rest.pulls.createReview({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
-                  commit_sha: lastCommitSha,
+                  pull_number: context.issue.number,
+                  commit_id: lastCommitSha,
                   body: `**File: ${file}**\n\n${reviewComment}`,
+                  event: 'COMMENT'
                 });
               }
             }
