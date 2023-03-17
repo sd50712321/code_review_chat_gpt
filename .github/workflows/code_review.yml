@@ -92,7 +92,7 @@ jobs:
 
                 if (changedFile) {
                   lastCommitSha = commit.sha;
-                  lastLine = changedFile.patch.split('\n').pop();
+                  lastLine = changedFile.patch.split('\n').reverse().find(line => line.startsWith('+'));
                   break;
                 }
               }
