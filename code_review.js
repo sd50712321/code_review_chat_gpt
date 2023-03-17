@@ -2,8 +2,28 @@ const fs = require('fs');
 const path = require('path');
 const { promisify } = require('util');
 const { Configuration, OpenAIApi } = require('openai');
+const axios = require('axios');
 
 const readFile = promisify(fs.readFile);
+
+const isGitLab = process.env.CI_PROJECT_URL.includes('gitlab.com');
+
+async function createGitLabComment(projectId, mergeRequestId, reviewText) {
+  const gitlabApiToken = process.env.GITLAB_API_TOKEN;
+
+  const url = `https://gitlab.com/api/v4/projects/${projectId}/merge_requests/${mergeRequestId}/discussions`;
+
+  const headers = {
+    'Content-Type': 'application/json',
+    'Private-Token': gitlabApiToken,
+  };
+
+  const body = {
+    body: reviewText,
+  };
+
+  return axios.post(url, body, { headers });
+}
 
 const configuration = new Configuration({
   apiKey: process.env.OPENAI_API_KEY,
@@ -46,7 +66,27 @@ async function main() {
 }
 
 main()
-  .then(console.log)
+  .then((reviews) => {
+    if (isGitLab) {
+      const projectId = process.env.CI_PROJECT_ID;
+      const mergeRequestId = process.env.CI_MERGE_REQUEST_IID;
+      const reviewText = Object.entries(JSON.parse(reviews))
+        .map(([file, review]) => `## File: ${file}\n\n${review}`)
+        .join('\n\n');
+      const reviewComment = `Code Review 결과:\n\n${reviewText}\n`;
+      createGitLabComment(projectId, mergeRequestId, reviewComment)
+        .then(() => console.log('Comment added to GitLab Merge Request'))
+        .catch((error) => {
+          console.error(
+            'Failed to add comment to GitLab Merge Request:',
+            error,
+          );
+          process.exit(1);
+        });
+    } else {
+      console.log(reviews);
+    }
+  })
   .catch((error) => {
     // console.error(error);
     console.log('error', error);
