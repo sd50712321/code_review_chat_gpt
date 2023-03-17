@@ -92,6 +92,8 @@ jobs:
                 if (changedFile) {
                   lastCommitSha = commit.sha;
                 }
+                console.log(`Commit: ${commit.sha}`);
+                console.log(commitData.files.map(f => f.filename));
               }
 
               if (lastCommitSha) {
@@ -104,7 +106,5 @@ jobs:
                 });
               }
             }
-            console.log(`Commit: ${commit.sha}`);
-            console.log(commitData.files.map(f => f.filename));
         env:
           REVIEWS: ${{ steps.code_review.outputs.reviews }}
