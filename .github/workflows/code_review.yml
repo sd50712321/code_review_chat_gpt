@@ -68,10 +68,8 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const reviews = JSON.parse(process.env.REVIEWS);
-            const reviewText = Object.entries(reviews).map(([file, review]) => `## File: ${file}\n\n${review}`).join('\n\n');
-            const reviewComment = `Code Review 결과:\n\n${reviewText}\n`;
 
-            // PR의 마지막 커밋 SHA 가져오기
+            // PR의 마지막 커밋 가져오기
             const { data: pr } = await github.rest.pulls.get({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -79,14 +77,32 @@ jobs:
             });
             const lastCommitSha = pr.head.sha;
 
-            // 리뷰를 생성하고 마지막 커밋에 연결
-            await github.rest.pulls.createReview({
+            // 마지막 커밋에 변경된 파일 가져오기
+            const { data: commit } = await github.rest.repos.getCommit({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              pull_number: context.issue.number,
-              commit_id: lastCommitSha,
-              body: reviewComment,
-              event: 'COMMENT'
+              ref: lastCommitSha
             });
+            const changedFiles = commit.files;
+
+            // 변경된 파일에 대한 리뷰만 남기기
+            for (const [file, review] of Object.entries(reviews)) {
+              const changedFile = changedFiles.find(f => f.filename === file);
+              if (changedFile) {
+                const lastLine = changedFile.patch.split('\n').pop();
+                const line = parseInt(lastLine.match(/\+(\d+)/)[1]);
+
+                const reviewComment = `${review}\n`;
+                await github.rest.pulls.createReviewComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  pull_number: context.issue.number,
+                  commit_id: lastCommitSha,
+                  body: reviewComment,
+                  path: file,
+                  line
+                });
+              }
+            }
         env:
           REVIEWS: ${{ steps.code_review.outputs.reviews }}
