@@ -108,4 +108,11 @@ export class UsersService {
     const { users_idx_array } = multiDeleteUsersDto;
     return await this.usersRepository.multipleDelete(users_idx_array);
   }
+
+  async 한글함수() {
+    const test1 = 'a';
+    const test2 = 'a';
+    const test3 = 'a';
+    return undefined;
+  }
 }
