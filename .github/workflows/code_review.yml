@@ -103,13 +103,24 @@ jobs:
 
               if (lastCommitSha) {
                 const reviewComment = `${review}\n`;
-                await github.rest.pulls.createReview({
+
+                const { data: diff } = await github.rest.repos.getCommit({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  ref: lastCommitSha
+                });
+
+                const changedFile = diff.files.find(f => f.filename === file);
+                const position = changedFile.patch.split('\n').length - 1;
+
+                await github.rest.pulls.createReviewComment({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
                   pull_number: context.issue.number,
                   commit_id: lastCommitSha,
                   body: `**File: ${file}**\n\n${reviewComment}`,
-                  event: 'COMMENT'
+                  path: file,
+                  position: position
                 });
               }
             }
