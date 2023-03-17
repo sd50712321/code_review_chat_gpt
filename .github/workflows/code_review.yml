@@ -58,9 +58,15 @@ jobs:
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
+      - name: Install jq
+        run: sudo apt-get install jq
+
       - name: Debugging REVIEWS
         run: |
-          echo "REVIEWS: ${{ steps.code_review.outputs.reviews }}"
+          echo 'REVIEWS:'
+          echo "$REVIEWS" | jq .
+        env:
+          REVIEWS: ${{ steps.code_review.outputs.reviews }}
 
       - name: Add Code Review Comment
         uses: actions/github-script@v5
@@ -68,13 +74,55 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const reviews = JSON.parse(process.env.REVIEWS);
-            const reviewText = Object.entries(reviews).map(([file, review]) => `## File: ${file}\n\n${review}`).join('\n\n');
-            const reviewComment = `Code Review 결과:\n\n${reviewText}\n`;
-            await github.rest.issues.createComment({
-              issue_number: context.issue.number,
+
+            // PR의 커밋 목록 가져오기
+            const { data: commits } = await github.rest.pulls.listCommits({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: reviewComment
+              pull_number: context.issue.number
             });
+
+            // 변경된 파일에 대한 리뷰만 남기기
+            for (const [file, review] of Object.entries(reviews)) {
+              let lastCommitSha;
+
+              // 파일이 변경된 마지막 커밋 찾기
+              for (const commit of commits) {
+                const { data: commitData } = await github.rest.repos.getCommit({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  ref: commit.sha
+                });
+                const changedFile = commitData.files.find(f => f.filename === file);
+                if (changedFile) {
+                  console.log(`Changed file found: ${changedFile.filename}`);
+                  lastCommitSha = commit.sha;
+                  break;
+                }
+              }
+
+              if (lastCommitSha) {
+                const reviewComment = `${review}\n`;
+
+                const { data: diff } = await github.rest.repos.getCommit({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  ref: lastCommitSha
+                });
+
+                const changedFile = diff.files.find(f => f.filename === file);
+                const position = changedFile.patch.split('\n').length - 1;
+
+                await github.rest.pulls.createReviewComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  pull_number: context.issue.number,
+                  commit_id: lastCommitSha,
+                  body: `**File: ${file}**\n\n${reviewComment}`,
+                  path: file,
+                  position: position
+                });
+              }
+            }
         env:
           REVIEWS: ${{ steps.code_review.outputs.reviews }}

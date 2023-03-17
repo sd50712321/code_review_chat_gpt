@@ -108,4 +108,11 @@ export class UsersService {
     const { users_idx_array } = multiDeleteUsersDto;
     return await this.usersRepository.multipleDelete(users_idx_array);
   }
+
+  async 마지막커밋댓글() {
+    const test = 'a';
+    let b = 1;
+    b = 3;
+    return undefined;
+  }
 }

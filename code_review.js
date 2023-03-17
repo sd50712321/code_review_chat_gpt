@@ -33,6 +33,7 @@ const configuration = new Configuration({
 const openai = new OpenAIApi(configuration);
 
 async function main() {
+  const projectRoot = process.cwd();
   const files = process.argv.slice(2);
   const reviews = {};
 
@@ -61,7 +62,8 @@ async function main() {
     );
 
     const review = completions.data.choices[0].message.content;
-    reviews[path.basename(file)] = review;
+    const relativeFilePath = path.relative(projectRoot, file);
+    reviews[relativeFilePath] = review;
   }
 
   return JSON.stringify(reviews);
