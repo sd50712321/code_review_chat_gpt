@@ -69,27 +69,35 @@ jobs:
           script: |
             const reviews = JSON.parse(process.env.REVIEWS);
 
-            // PR의 마지막 커밋 가져오기
-            const { data: pr } = await github.rest.pulls.get({
+            // PR의 커밋 목록 가져오기
+            const { data: commits } = await github.rest.pulls.listCommits({
               owner: context.repo.owner,
               repo: context.repo.repo,
               pull_number: context.issue.number
             });
-            const lastCommitSha = pr.head.sha;
-
-            // 마지막 커밋에 변경된 파일 가져오기
-            const { data: commit } = await github.rest.repos.getCommit({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              ref: lastCommitSha
-            });
-            const changedFiles = commit.files;
 
             // 변경된 파일에 대한 리뷰만 남기기
             for (const [file, review] of Object.entries(reviews)) {
-              const changedFile = changedFiles.find(f => f.filename === file);
-              if (changedFile) {
-                const lastLine = changedFile.patch.split('\n').pop();
+              let lastCommitSha;
+              let lastLine;
+
+              // 파일이 변경된 마지막 커밋 찾기
+              for (const commit of commits.reverse()) {
+                const { data: commitData } = await github.rest.repos.getCommit({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  ref: commit.sha
+                });
+                const changedFile = commitData.files.find(f => f.filename === file);
+
+                if (changedFile) {
+                  lastCommitSha = commit.sha;
+                  lastLine = changedFile.patch.split('\n').pop();
+                  break;
+                }
+              }
+
+              if (lastCommitSha && lastLine) {
                 const line = parseInt(lastLine.match(/\+(\d+)/)[1]);
 
                 const reviewComment = `${review}\n`;
