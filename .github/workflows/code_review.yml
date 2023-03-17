@@ -80,18 +80,19 @@ jobs:
             for (const [file, review] of Object.entries(reviews)) {
               console.log(`Processing file: ${file}`);
               console.log(`Review: ${review}`);
-              
+
               let lastCommitSha;
 
               // 파일이 변경된 마지막 커밋 찾기
               for (const commit of commits) {
+                console.log('commit', commit)
                 const { data: commitData } = await github.rest.repos.getCommit({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
                   ref: commit.sha
                 });
                 const changedFile = commitData.files.find(f => f.filename === file);
-
+                console.log('changedFile', changedFile)
                 if (changedFile) {
                   console.log(`Changed file found: ${changedFile.filename}`);
                   lastCommitSha = commit.sha;
