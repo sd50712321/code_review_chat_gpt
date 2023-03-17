@@ -109,12 +109,14 @@ jobs:
 
               if (lastCommitSha) {
                 const reviewComment = `${review}\n`;
-                await github.rest.repos.createCommitComment({
+                console.log('reviewComment', reviewComment)
+                const result = await github.rest.repos.createCommitComment({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
                   commit_sha: lastCommitSha,
                   body: `**File: ${file}**\n\n${reviewComment}`,
                 });
+                console.log('github.rest.repos.createCommitComment', result)
               }
             }
         env:
