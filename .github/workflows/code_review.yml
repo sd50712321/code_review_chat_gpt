@@ -97,6 +97,7 @@ jobs:
                   repo: context.repo.repo,
                   ref: commit.sha
                 });
+                console.log('commitData', commitData)
                 const changedFile = commitData.files.find(f => f.filename === file);
                 console.log('changedFile', changedFile)
                 if (changedFile) {
