@@ -68,8 +68,10 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const reviews = JSON.parse(process.env.REVIEWS);
+            const reviewText = Object.entries(reviews).map(([file, review]) => `## File: ${file}\n\n${review}`).join('\n\n');
+            const reviewComment = `Code Review 결과:\n\n${reviewText}\n`;
 
-            // PR의 마지막 커밋 가져오기
+            // PR의 마지막 커밋 SHA 가져오기
             const { data: pr } = await github.rest.pulls.get({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -77,27 +79,14 @@ jobs:
             });
             const lastCommitSha = pr.head.sha;
 
-            // 마지막 커밋에 변경된 파일 가져오기
-            const { data: commit } = await github.rest.repos.getCommit({
+            // 리뷰를 생성하고 마지막 커밋에 연결
+            await github.rest.pulls.createReview({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              ref: lastCommitSha
+              pull_number: context.issue.number,
+              commit_id: lastCommitSha,
+              body: reviewComment,
+              event: 'COMMENT'
             });
-            const changedFiles = commit.files.map(file => file.filename);
-
-            // 변경된 파일에 대한 리뷰만 남기기
-            for (const [file, review] of Object.entries(reviews)) {
-              if (changedFiles.includes(file)) {
-                const reviewComment = `## File: ${file}\n\n${review}\n`;
-                await github.rest.pulls.createReview({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  pull_number: context.issue.number,
-                  commit_id: lastCommitSha,
-                  body: reviewComment,
-                  event: 'COMMENT'
-                });
-              }
-            }
         env:
           REVIEWS: ${{ steps.code_review.outputs.reviews }}
