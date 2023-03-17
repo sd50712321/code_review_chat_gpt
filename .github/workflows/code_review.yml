@@ -91,9 +91,8 @@ jobs:
 
                 if (changedFile) {
                   lastCommitSha = commit.sha;
+                  break;
                 }
-                console.log(`Commit: ${commit.sha}`);
-                console.log(commitData.files.map(f => f.filename));
               }
 
               if (lastCommitSha) {
