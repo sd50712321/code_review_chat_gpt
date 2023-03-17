@@ -71,7 +71,7 @@ jobs:
       - name: Add Code Review Comment
         uses: actions/github-script@v5
         with:
-          github-token: ${{ secrets.API_TOKEN }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const reviews = JSON.parse(process.env.REVIEWS);
 
@@ -84,22 +84,16 @@ jobs:
 
             // 변경된 파일에 대한 리뷰만 남기기
             for (const [file, review] of Object.entries(reviews)) {
-              console.log(`Processing file: ${file}`);
-              console.log(`Review: ${review}`);
-
               let lastCommitSha;
 
               // 파일이 변경된 마지막 커밋 찾기
               for (const commit of commits) {
-                console.log('commit', commit)
                 const { data: commitData } = await github.rest.repos.getCommit({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
                   ref: commit.sha
                 });
-                console.log('commitData', commitData)
                 const changedFile = commitData.files.find(f => f.filename === file);
-                console.log('changedFile', changedFile)
                 if (changedFile) {
                   console.log(`Changed file found: ${changedFile.filename}`);
                   lastCommitSha = commit.sha;
@@ -109,14 +103,12 @@ jobs:
 
               if (lastCommitSha) {
                 const reviewComment = `${review}\n`;
-                console.log('reviewComment', reviewComment)
                 const result = await github.rest.repos.createCommitComment({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
                   commit_sha: lastCommitSha,
                   body: `**File: ${file}**\n\n${reviewComment}`,
                 });
-                console.log('github.rest.repos.createCommitComment', result)
               }
             }
         env:
