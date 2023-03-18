@@ -68,9 +68,14 @@ async function addReviewToGitHub(reviews) {
 }
 
 async function addReviewToGitLab(reviews) {
+  // JSON 문자열이 아닌 객체가 전달된 경우 JSON 문자열로 변환
+  const reviewsString =
+    typeof reviews === 'string' ? reviews : JSON.stringify(reviews);
+
   const projectId = process.env.CI_PROJECT_ID;
   const mergeRequestId = process.env.CI_MERGE_REQUEST_IID;
-  const reviewText = Object.entries(JSON.parse(reviews))
+  const parsedReviews = JSON.parse(reviewsString);
+  const reviewText = Object.entries(parsedReviews)
     .map(([file, review]) => `## File: ${file}\n\n${review}`)
     .join('\n\n');
   const reviewComment = `Code Review 결과:\n\n${reviewText}\n`;
