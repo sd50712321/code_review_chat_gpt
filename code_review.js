@@ -82,6 +82,30 @@ async function addReviewToGitLab(reviews) {
     });
 }
 
+async function createGitLabComment(projectId, mergeRequestId, comment) {
+  const gitlabApiToken = process.env.GITLAB_API_TOKEN;
+  const gitlabApiUrl = `https://gitlab.com/api/v4/projects/${projectId}/merge_requests/${mergeRequestId}/notes`;
+
+  const headers = {
+    'Content-Type': 'application/json',
+    'PRIVATE-TOKEN': gitlabApiToken,
+  };
+
+  const body = JSON.stringify({
+    body: comment,
+  });
+
+  try {
+    const response = await axios.post(gitlabApiUrl, body, {
+      headers: headers,
+    });
+    return response;
+  } catch (error) {
+    console.error('Error while posting GitLab comment:', error);
+    throw error;
+  }
+}
+
 class ReviewPlatform {
   constructor(platform) {
     this.platform = platform;
