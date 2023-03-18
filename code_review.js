@@ -3,7 +3,8 @@ const path = require('path');
 const { promisify } = require('util');
 const { Configuration, OpenAIApi } = require('openai');
 const axios = require('axios');
-const { github } = require('@actions/github');
+const { getOctokit, context } = require('@actions/github');
+const core = require('@actions/core');
 
 const readFile = promisify(fs.readFile);
 const configuration = new Configuration({
@@ -16,8 +17,8 @@ const isGitLab = process.env.CI_PROJECT_URL
 
 async function addReviewToGitHub(reviews) {
   const githubToken = process.env.GITHUB_TOKEN;
-  const octokit = github.getOctokit(githubToken);
-  const context = github.context;
+  const octokit = getOctokit(githubToken);
+  // const context = context
   const { data: commits } = await octokit.rest.pulls.listCommits({
     owner: context.repo.owner,
     repo: context.repo.repo,
