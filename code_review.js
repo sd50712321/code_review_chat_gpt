@@ -81,7 +81,16 @@ async function findLastCommitForFile(projectId, mergeRequestId, file) {
     const commits = response.data;
 
     for (const commit of commits) {
-      if (commit.added.includes(file) || commit.modified.includes(file)) {
+      const commitDetails = await axios.get(
+        `https://gitlab.com/api/v4/projects/${projectId}/repository/commits/${commit.id}/diff`,
+        { headers: headers },
+      );
+
+      const changedFile = commitDetails.data.find(
+        (diff) => diff.new_path === file || diff.old_path === file,
+      );
+
+      if (changedFile) {
         return commit.id;
       }
     }
