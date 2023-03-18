@@ -67,27 +67,69 @@ async function addReviewToGitHub(reviews) {
   }
 }
 
-async function addReviewToGitLab(reviews) {
-  // JSON 문자열이 아닌 객체가 전달된 경우 JSON 문자열로 변환
-  const reviewsString =
-    typeof reviews === 'string' ? reviews : JSON.stringify(reviews);
+async function findLastCommitForFile(projectId, mergeRequestId, file) {
+  const gitlabApiToken = process.env.GITLAB_API_TOKEN;
+  const gitlabApiUrl = `https://gitlab.com/api/v4/projects/${projectId}/merge_requests/${mergeRequestId}/commits`;
 
-  const projectId = process.env.CI_PROJECT_ID;
-  const mergeRequestId = process.env.CI_MERGE_REQUEST_IID;
-  const parsedReviews = JSON.parse(reviewsString);
-  const reviewText = Object.entries(parsedReviews)
-    .map(([file, review]) => `## File: ${file}\n\n${review}`)
-    .join('\n\n');
-  const reviewComment = `Code Review 결과:\n\n${reviewText}\n`;
-  createGitLabComment(projectId, mergeRequestId, reviewComment)
-    .then(() => console.log('Comment added to GitLab Merge Request'))
-    .catch((error) => {
-      console.error('Failed to add comment to GitLab Merge Request:', error);
-      process.exit(1);
-    });
+  const headers = {
+    'Content-Type': 'application/json',
+    'PRIVATE-TOKEN': gitlabApiToken,
+  };
+
+  try {
+    const response = await axios.get(gitlabApiUrl, { headers: headers });
+    const commits = response.data;
+
+    for (const commit of commits) {
+      if (commit.added.includes(file) || commit.modified.includes(file)) {
+        return commit.id;
+      }
+    }
+  } catch (error) {
+    console.error('Error while fetching GitLab commits:', error);
+    throw error;
+  }
+
+  return null;
 }
 
-async function createGitLabComment(projectId, mergeRequestId, comment) {
+async function addReviewToGitLab(reviews) {
+  const projectId = process.env.CI_PROJECT_ID;
+  const mergeRequestId = process.env.CI_MERGE_REQUEST_IID;
+
+  for (const [file, review] of Object.entries(reviews)) {
+    const lastCommitSha = await findLastCommitForFile(
+      projectId,
+      mergeRequestId,
+      file,
+    );
+
+    if (lastCommitSha) {
+      const reviewComment = `**File: ${file}**\n\n${review}\n`;
+      createGitLabComment(
+        projectId,
+        mergeRequestId,
+        reviewComment,
+        lastCommitSha,
+      )
+        .then(() => console.log('Comment added to GitLab Merge Request'))
+        .catch((error) => {
+          console.error(
+            'Failed to add comment to GitLab Merge Request:',
+            error,
+          );
+          process.exit(1);
+        });
+    }
+  }
+}
+
+async function createGitLabComment(
+  projectId,
+  mergeRequestId,
+  comment,
+  commitSha,
+) {
   const gitlabApiToken = process.env.GITLAB_API_TOKEN;
   const gitlabApiUrl = `https://gitlab.com/api/v4/projects/${projectId}/merge_requests/${mergeRequestId}/notes`;
 
@@ -98,6 +140,14 @@ async function createGitLabComment(projectId, mergeRequestId, comment) {
 
   const body = JSON.stringify({
     body: comment,
+    position: {
+      base_sha: commitSha,
+      start_sha: commitSha,
+      head_sha: commitSha,
+      position_type: 'text',
+      new_path: '',
+      new_line: null,
+    },
   });
 
   try {
