@@ -43,9 +43,19 @@ jobs:
 
       - name: Code Review with ChatGPT
         id: code_review
-        run: node code_review.js ${{ github.event.pull_request.changed_files }}
+        run: |
+          file_list="${{ env.changed_files }}"
+          IFS=' ' read -ra files_array <<< "$file_list" # 공백을 기준으로 문자열을 배열로 변환
+          reviews=$(node code_review.js "${files_array[@]}") # 배열을 인수로 전달
+          if [ -z "$reviews" ]; then
+            echo "No reviews generated"
+            echo "::set-output name=reviews::{}" # empty JSON object
+          else
+            echo "리뷰 결과:"
+            echo "$reviews"
+            echo "::set-output name=reviews::$reviews"
+          fi
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
       - name: Install jq
@@ -57,3 +67,10 @@ jobs:
           echo "$REVIEWS" | jq .
         env:
           REVIEWS: ${{ steps.code_review.outputs.reviews }}
+
+      - name: Add Code Review
+        id: add_code_review
+        run: node code_review.js ${{ github.event.pull_request.changed_files }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
