@@ -92,6 +92,10 @@ class ReviewPlatform {
 }
 
 async function main() {
+  const configuration = new Configuration({
+    apiKey: process.env.OPENAI_API_KEY,
+  });
+  const openai = new OpenAIApi(configuration);
   const projectRoot = process.cwd();
   const files = process.argv.slice(2);
   const reviews = {};
