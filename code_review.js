@@ -3,40 +3,100 @@ const path = require('path');
 const { promisify } = require('util');
 const { Configuration, OpenAIApi } = require('openai');
 const axios = require('axios');
+const { github } = require('@actions/github');
+const core = require('@actions/core');
 
 const readFile = promisify(fs.readFile);
 
-const isGitLab = process.env.CI_PROJECT_URL
-  ? process.env.CI_PROJECT_URL.includes('gitlab.com')
-  : false;
+async function addReviewToGitHub(reviews) {
+  const githubToken = core.getInput('github-token');
+  const octokit = github.getOctokit(githubToken);
+  const context = github.context;
+  const { data: commits } = await octokit.rest.pulls.listCommits({
+    owner: context.repo.owner,
+    repo: context.repo.repo,
+    pull_number: context.issue.number,
+  });
 
-async function createGitLabComment(projectId, mergeRequestId, reviewText) {
-  const gitlabApiToken = process.env.GITLAB_API_TOKEN;
+  for (const [file, review] of Object.entries(reviews)) {
+    let lastCommitSha;
 
-  const url = `https://gitlab.com/api/v4/projects/${projectId}/merge_requests/${mergeRequestId}/discussions`;
+    for (const commit of commits) {
+      const { data: commitData } = await octokit.rest.repos.getCommit({
+        owner: context.repo.owner,
+        repo: context.repo.repo,
+        ref: commit.sha,
+      });
+      const changedFile = commitData.files.find((f) => f.filename === file);
+      if (changedFile) {
+        console.log(`Changed file found: ${changedFile.filename}`);
+        lastCommitSha = commit.sha;
+        break;
+      }
+    }
 
-  const headers = {
-    'Content-Type': 'application/json',
-    'Private-Token': gitlabApiToken,
-  };
+    if (lastCommitSha) {
+      const reviewComment = `${review}\n`;
 
-  const body = {
-    body: reviewText,
-  };
+      const { data: diff } = await octokit.rest.repos.getCommit({
+        owner: context.repo.owner,
+        repo: context.repo.repo,
+        ref: lastCommitSha,
+      });
 
-  return axios.post(url, body, { headers });
+      const changedFile = diff.files.find((f) => f.filename === file);
+      const position = changedFile.patch.split('\n').length - 1;
+
+      await octokit.rest.pulls.createReviewComment({
+        owner: context.repo.owner,
+        repo: context.repo.repo,
+        pull_number: context.issue.number,
+        commit_id: lastCommitSha,
+        body: `**File: ${file}**\n\n${reviewComment}`,
+        path: file,
+        position: position,
+      });
+    }
+  }
 }
 
-const configuration = new Configuration({
-  apiKey: process.env.OPENAI_API_KEY,
-});
-const openai = new OpenAIApi(configuration);
+async function addReviewToGitLab(reviews) {
+  const projectId = process.env.CI_PROJECT_ID;
+  const mergeRequestId = process.env.CI_MERGE_REQUEST_IID;
+  const reviewText = Object.entries(JSON.parse(reviews))
+    .map(([file, review]) => `## File: ${file}\n\n${review}`)
+    .join('\n\n');
+  const reviewComment = `Code Review 결과:\n\n${reviewText}\n`;
+  createGitLabComment(projectId, mergeRequestId, reviewComment)
+    .then(() => console.log('Comment added to GitLab Merge Request'))
+    .catch((error) => {
+      console.error('Failed to add comment to GitLab Merge Request:', error);
+      process.exit(1);
+    });
+}
+
+class ReviewPlatform {
+  constructor(platform) {
+    this.platform = platform;
+  }
+
+  async addReview(reviews) {
+    if (this.platform === 'github') {
+      return addReviewToGitHub(reviews);
+    } else if (this.platform === 'gitlab') {
+      return addReviewToGitLab(reviews);
+    } else {
+      throw new Error(`Unsupported platform: ${this.platform}`);
+    }
+  }
+}
 
 async function main() {
   const projectRoot = process.cwd();
   const files = process.argv.slice(2);
   const reviews = {};
 
+  // 코드리뷰 생성
   for (const file of files) {
     const code = await readFile(file, 'utf-8');
     const prompt = `Please review the following TypeScript code:\n\n${code}\n`;
@@ -66,34 +126,24 @@ async function main() {
     reviews[relativeFilePath] = review;
   }
 
-  return JSON.stringify(reviews);
+  const platform = isGitLab ? 'gitlab' : 'github';
+  const reviewPlatform = new ReviewPlatform(platform);
+
+  reviewPlatform
+    .addReview(reviews)
+    .then(() =>
+      console.log(`Comment added to ${platform.toUpperCase()}Merge Request`),
+    )
+    .catch((error) => {
+      console.error(
+        `Failed to add comment to ${platform.toUpperCase()} Merge Request:`,
+        error,
+      );
+      process.exit(1);
+    });
 }
 
-main()
-  .then((reviews) => {
-    if (isGitLab) {
-      const projectId = process.env.CI_PROJECT_ID;
-      const mergeRequestId = process.env.CI_MERGE_REQUEST_IID;
-      const reviewText = Object.entries(JSON.parse(reviews))
-        .map(([file, review]) => `## File: ${file}\n\n${review}`)
-        .join('\n\n');
-      const reviewComment = `Code Review 결과:\n\n${reviewText}\n`;
-      createGitLabComment(projectId, mergeRequestId, reviewComment)
-        .then(() => console.log('Comment added to GitLab Merge Request'))
-        .catch((error) => {
-          console.error(
-            'Failed to add comment to GitLab Merge Request:',
-            error,
-          );
-          process.exit(1);
-        });
-    } else {
-      console.log(reviews);
-    }
-  })
-  .catch((error) => {
-    // console.error(error);
-    console.log('error', error);
-    console.log('error', error?.response);
-    process.exit(1);
-  });
+main().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});
