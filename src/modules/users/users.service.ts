@@ -115,4 +115,11 @@ export class UsersService {
     b = 3;
     return undefined;
   }
+
+  async 마지막커밋댓글2() {
+    const test = 'a';
+    let b = 1;
+    b = 3;
+    return undefined;
+  }
 }
