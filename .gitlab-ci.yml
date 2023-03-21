@@ -24,7 +24,7 @@ code_review:
     - yarn install --frozen-lockfile --prefer-offline
     - yarn add ts-node --dev # ts-node를 설치합니다.
     - |
-      changed_files=$(git diff --name-only $CI_MERGE_REQUEST_DIFF_BASE_SHA $CI_COMMIT_SHA -- 'src/**/*.ts') # 변경됨
+      changed_files=$(git diff --name-only --diff-filter=d $CI_MERGE_REQUEST_DIFF_BASE_SHA $CI_COMMIT_SHA -- 'src/**/*.ts') # 변경됨
       changed_files="${changed_files//$'\n'/ }"
       echo "Changed Files: $changed_files"
       echo "changed_files=$changed_files" > dotenv.report
