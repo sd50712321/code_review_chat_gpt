@@ -22,13 +22,14 @@ code_review:
   script:
     - apt-get update -qq && apt-get install -y -qq git
     - yarn install --frozen-lockfile --prefer-offline
+    - yarn add ts-node --dev # ts-node를 설치합니다.
     - |
-      changed_files=$(git diff --name-only $CI_MERGE_REQUEST_DIFF_BASE_SHA $CI_COMMIT_SHA -- 'src/**/*.js' 'src/**/*.ts')
+      changed_files=$(git diff --name-only $CI_MERGE_REQUEST_DIFF_BASE_SHA $CI_COMMIT_SHA -- 'src/**/*.ts') # 변경됨
       changed_files="${changed_files//$'\n'/ }"
       echo "Changed Files: $changed_files"
       echo "changed_files=$changed_files" > dotenv.report
-    - node code_review.js $changed_files
-    - GITLAB_API_TOKEN=$GITLAB_API_TOKEN node code_review.js $changed_files
+    - npx ts-node code_review.ts $changed_files # 변경됨: ts-node를 사용하여 실행
+    - GITLAB_API_TOKEN=$GITLAB_API_TOKEN npx ts-node code_review.ts $changed_files # 변경됨: ts-node를 사용하여 실행
   artifacts:
     reports:
       dotenv: dotenv.report
