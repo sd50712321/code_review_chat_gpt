@@ -15,7 +15,7 @@
     "start:prod": "cross-env NODE_ENV=prod node dist/main",
     "start:debug": "nest start --debug --watch",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
-    "test": "jest --config test/config/jest-unit.ts",
+    "test": "jest --config ./test/config/jest-unit.ts",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
