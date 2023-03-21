@@ -21,4 +21,12 @@ export class UsersService {
     b = 3;
     return undefined;
   }
+
+  async 마지막커밋댓글3() {
+    const test = 'a';
+    const aireo = 'b';
+    let b = 1;
+    b = 3;
+    return undefined;
+  }
 }
