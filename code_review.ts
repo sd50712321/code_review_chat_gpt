@@ -1,37 +1,41 @@
-const fs = require('fs');
-const path = require('path');
-const { promisify } = require('util');
-const { Configuration, OpenAIApi } = require('openai');
-const axios = require('axios');
-const { getOctokit, context } = require('@actions/github');
-const core = require('@actions/core');
+import fs from 'fs';
+import path from 'path';
+import { promisify } from 'util';
+import { ChatCompletionRequestMessage, Configuration, OpenAIApi } from 'openai';
+import axios from 'axios';
+import { getOctokit, context } from '@actions/github';
 
 const readFile = promisify(fs.readFile);
 const configuration = new Configuration({
   apiKey: process.env.OPENAI_API_KEY,
 });
 const openai = new OpenAIApi(configuration);
-const isGitLab = process.env.CI_PROJECT_URL
+const isGitLab: boolean = process.env.CI_PROJECT_URL
   ? process.env.CI_PROJECT_URL.includes('gitlab.com')
   : false;
+export function getContext() {
+  return context;
+}
 
-async function addReviewToGitHub(reviews) {
+export async function addReviewToGitHub(
+  reviews: Record<string, string>,
+): Promise<void> {
   const githubToken = process.env.GITHUB_TOKEN;
   const octokit = getOctokit(githubToken);
-  // const context = context
+
   const { data: commits } = await octokit.rest.pulls.listCommits({
-    owner: context.repo.owner,
-    repo: context.repo.repo,
-    pull_number: context.issue.number,
+    owner: getContext().repo.owner,
+    repo: getContext().repo.repo,
+    pull_number: getContext().issue.number,
   });
 
   for (const [file, review] of Object.entries(reviews)) {
-    let lastCommitSha;
+    let lastCommitSha: string | undefined;
 
     for (const commit of commits) {
       const { data: commitData } = await octokit.rest.repos.getCommit({
-        owner: context.repo.owner,
-        repo: context.repo.repo,
+        owner: getContext().repo.owner,
+        repo: getContext().repo.repo,
         ref: commit.sha,
       });
       const changedFile = commitData.files.find((f) => f.filename === file);
@@ -46,8 +50,8 @@ async function addReviewToGitHub(reviews) {
       const reviewComment = `${review}\n`;
 
       const { data: diff } = await octokit.rest.repos.getCommit({
-        owner: context.repo.owner,
-        repo: context.repo.repo,
+        owner: getContext().repo.owner,
+        repo: getContext().repo.repo,
         ref: lastCommitSha,
       });
 
@@ -55,9 +59,9 @@ async function addReviewToGitHub(reviews) {
       const position = changedFile.patch.split('\n').length - 1;
 
       await octokit.rest.pulls.createReviewComment({
-        owner: context.repo.owner,
-        repo: context.repo.repo,
-        pull_number: context.issue.number,
+        owner: getContext().repo.owner,
+        repo: getContext().repo.repo,
+        pull_number: getContext().issue.number,
         commit_id: lastCommitSha,
         body: `**File: ${file}**\n\n${reviewComment}`,
         path: file,
@@ -67,7 +71,11 @@ async function addReviewToGitHub(reviews) {
   }
 }
 
-async function findLastCommitForFile(projectId, mergeRequestId, file) {
+export async function findLastCommitForFile(
+  projectId: string,
+  mergeRequestId: string,
+  file: string,
+): Promise<string | null> {
   const gitlabApiToken = process.env.GITLAB_API_TOKEN;
   const gitlabApiUrl = `https://gitlab.com/api/v4/projects/${projectId}/merge_requests/${mergeRequestId}/commits`;
 
@@ -102,7 +110,9 @@ async function findLastCommitForFile(projectId, mergeRequestId, file) {
   return null;
 }
 
-async function addReviewToGitLab(reviews) {
+export async function addReviewToGitLab(
+  reviews: Record<string, string>,
+): Promise<void> {
   const projectId = process.env.CI_PROJECT_ID;
   const mergeRequestId = process.env.CI_MERGE_REQUEST_IID;
 
@@ -112,7 +122,6 @@ async function addReviewToGitLab(reviews) {
       mergeRequestId,
       file,
     );
-
     if (lastCommitSha) {
       const reviewComment = `**File: ${file}**\n\n${review}\n`;
       createGitLabComment(
@@ -133,12 +142,12 @@ async function addReviewToGitLab(reviews) {
   }
 }
 
-async function createGitLabComment(
-  projectId,
-  mergeRequestId,
-  comment,
-  commitSha,
-) {
+export async function createGitLabComment(
+  projectId: string,
+  mergeRequestId: string,
+  comment: string,
+  commitSha: string,
+): Promise<any> {
   const gitlabApiToken = process.env.GITLAB_API_TOKEN;
   const gitlabApiUrl = `https://gitlab.com/api/v4/projects/${projectId}/merge_requests/${mergeRequestId}/notes`;
 
@@ -171,11 +180,13 @@ async function createGitLabComment(
 }
 
 class ReviewPlatform {
-  constructor(platform) {
+  platform: string;
+
+  constructor(platform: string) {
     this.platform = platform;
   }
 
-  async addReview(reviews) {
+  async addReview(reviews: Record<string, string>): Promise<void> {
     if (this.platform === 'github') {
       return addReviewToGitHub(reviews);
     } else if (this.platform === 'gitlab') {
@@ -186,17 +197,15 @@ class ReviewPlatform {
   }
 }
 
-async function main() {
+export async function main(): Promise<void> {
   const projectRoot = process.cwd();
   const files = process.argv.slice(2);
-  const reviews = {};
+  const reviews: Record<string, string> = {};
 
-  // 코드리뷰 생성
   for (const file of files) {
     const code = await readFile(file, 'utf-8');
     const prompt = `Please review the following TypeScript code:\n\n${code}\n`;
-
-    const chatMessages = [
+    const chatMessages: Array<ChatCompletionRequestMessage> = [
       {
         role: 'system',
         content:
@@ -227,7 +236,7 @@ async function main() {
   reviewPlatform
     .addReview(reviews)
     .then(() =>
-      console.log(`Comment added to ${platform.toUpperCase()}Merge Request`),
+      console.log(`Comment added to ${platform.toUpperCase()} Merge Request`),
     )
     .catch((error) => {
       console.error(
@@ -238,7 +247,4 @@ async function main() {
     });
 }
 
-main().catch((error) => {
-  console.error(error);
-  process.exit(1);
-});
+main();
