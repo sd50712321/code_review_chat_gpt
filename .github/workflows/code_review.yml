@@ -36,7 +36,7 @@ jobs:
       - name: Get changed files
         id: changed_files
         run: |
-          changed_files=$(git diff --name-only --diff-filter=d ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }} -- 'src/**/*.ts') # 변경됨
+          changed_files=$(git diff --name-only --diff-filter=AM ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }} -- 'src/*.ts')
           changed_files="${changed_files//$'\n'/ }"
           echo "Changed Files: $changed_files"
           echo "changed_files=$changed_files" >> $GITHUB_ENV
