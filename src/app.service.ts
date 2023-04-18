@@ -26,4 +26,15 @@ export class AppService {
       console.error('err', err);
     }
   }
+  async tryCatchTest2(): Promise<Users> {
+    const user = new Users({
+      user_name: 'test',
+    });
+    try {
+      await sleep(1000);
+      return user;
+    } catch (err) {
+      console.error('err', err);
+    }
+  }
 }
